@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+
+# entornos virtuales / variables de entorno
+.venv/
+venv/
+.env
+
+# configuración local de Claude Code (no compartida entre devs)
+.claude/settings.local.json
+
+# archivos de SO / IDE
+.DS_Store
+.vscode/
+.idea/

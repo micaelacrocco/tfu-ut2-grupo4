@@ -1,0 +1,10 @@
+server:
+  port: 8000
+
+features:
+  greeting_enabled: true
+  request_logging_enabled: true
+
+business:
+  greeting_message: "Hola, bienvenido a la API"
+  mode: friendly

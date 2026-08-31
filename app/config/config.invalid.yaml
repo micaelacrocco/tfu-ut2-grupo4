@@ -1,0 +1,10 @@
+server:
+  port: "not-a-number"
+
+features:
+  greeting_enabled: true
+  request_logging_enabled: true
+
+business:
+  greeting_message: ""
+  mode: aggressive

@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TFU UT2 — Tácticas de Arquitectura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:      #2D3F54;
+    --slate:     #52647A;
+    --green:     #73CC80;
+    --blue-deep: #004C94;
+    --blue:      #006ECF;
+    --blue-brt:  #3C93FA;
+    --teal-brt:  #00D4C6;
+    --teal:      #0FA69D;
+    --teal-deep: #028183;
+
+    --bg: var(--navy);
+    --ink: #E9EFF5;
+    --ink-dim: #9FB0C3;
+    --line: rgba(159,176,195,0.22);
+    --dotgrid: rgba(82,100,122,0.55);
+    --panel: rgba(233,239,245,0.035);
+    --panel-line: rgba(233,239,245,0.12);
+
+    --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{
+    background:
+      radial-gradient(circle, var(--dotgrid) 1px, transparent 1px) 0 0/28px 28px,
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    overflow:hidden;
+  }
+  h1,h2,h3{ font-weight:600; margin:0; text-wrap:balance; }
+  p{ margin:0; }
+
+  /* ---------- deck / slides ---------- */
+  #deck{
+    height:100vh; width:100vw;
+    overflow-y:scroll;
+    scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;
+  }
+  .slide{
+    position:relative;
+    height:100vh; width:100vw;
+    scroll-snap-align:start;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:2.2rem;
+    padding:9vh 8vw;
+    overflow:hidden;
+  }
+  .slide.slide-diagram{ padding:4.5vh 5vw; gap:.9rem; }
+  .slide::before{ /* faint directional glow, one per slide role */
+    content:""; position:absolute; inset:0; pointer-events:none; opacity:0.5;
+    background:radial-gradient(ellipse 60% 45% at var(--glow-x,50%) var(--glow-y,10%), var(--glow, transparent), transparent 70%);
+  }
+  .slide > *{ position:relative; }
+
+  .reveal{ opacity:1; }
+  @media (prefers-reduced-motion:no-preference){
+    .reveal{ opacity:0; transform:translateY(14px); transition:opacity .7s ease, transform .7s ease; }
+    .reveal.in{ opacity:1; transform:none; }
+    .reveal.d1{ transition-delay:.08s; }
+    .reveal.d2{ transition-delay:.16s; }
+    .reveal.d3{ transition-delay:.24s; }
+  }
+
+  /* ---------- typographic building blocks ---------- */
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:.5em;
+    font-family:var(--font-mono); font-size:.78rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-dim);
+    border:1px solid var(--panel-line); border-radius:999px;
+    padding:.42em 1em;
+  }
+  .eyebrow b{ color:var(--dot,var(--teal-brt)); font-weight:600; }
+
+  .title{ font-size:clamp(2.1rem,3.6vw,3.35rem); text-align:center; max-width:22ch; line-height:1.14; }
+  .subtitle{ font-size:clamp(1rem,1.5vw,1.25rem); color:var(--ink-dim); text-align:center; max-width:52ch; font-weight:400; }
+  .kicker{ font-family:var(--font-mono); font-size:.85rem; color:var(--ink-dim); text-align:center; letter-spacing:.02em; }
+
+  /* ---------- quote card for RNF text ---------- */
+  .quote-card{
+    background:var(--panel); border:1px solid var(--panel-line);
+    border-left:3px solid var(--accent, var(--teal-brt));
+    border-radius:4px; padding:2.2rem 2.6rem;
+    max-width:840px;
+    font-size:clamp(1.12rem,1.9vw,1.55rem); line-height:1.55;
+  }
+  .quote-card::before{ content:"“"; font-family:var(--font-sans); font-size:2.2em; color:var(--accent,var(--teal-brt)); opacity:.5; line-height:0; display:block; margin-bottom:.15em; }
+
+  .tag{
+    font-family:var(--font-mono); font-size:.82rem; letter-spacing:.02em;
+    color:var(--bg); background:var(--accent,var(--teal-brt));
+    padding:.5em 1em; border-radius:3px; font-weight:600;
+  }
+  .tag-row{ display:flex; gap:.7rem; flex-wrap:wrap; justify-content:center; }
+  .tag-ghost{
+    font-family:var(--font-mono); font-size:.82rem; color:var(--accent,var(--ink-dim));
+    border:1px solid var(--accent,var(--panel-line)); padding:.5em 1em; border-radius:3px;
+  }
+
+  /* ---------- diagrams ---------- */
+  figure.diagram{ margin:0; display:flex; flex-direction:column; align-items:center; gap:.6rem; width:100%; min-height:0; }
+  figure.diagram svg{ width:auto; height:auto; max-width:min(100%,1080px); max-height:60vh; color:var(--ink-dim); }
+  figure.diagram figcaption{ font-size:.86rem; color:var(--ink-dim); text-align:center; max-width:58ch; line-height:1.4; }
+  figure.diagram figcaption code{ font-family:var(--font-mono); color:var(--ink); }
+
+  /* ---------- split layout: diagram left, text right ---------- */
+  .slide-split .split{ display:flex; align-items:center; gap:3rem; width:100%; max-width:1180px; min-height:0; }
+  .slide-split .split figure.diagram{ flex:1 1 60%; min-width:0; }
+  .slide-split .split-text{ flex:1 1 34%; text-align:left; }
+  .slide-split .split-text ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:1rem; }
+  .slide-split .split-text li{ font-size:1.05rem; line-height:1.5; padding-left:1.2em; position:relative; color:var(--ink); }
+  .slide-split .split-text li::before{ content:"—"; position:absolute; left:0; color:#00D4C6; }
+  .slide-split .split-text code{ font-family:var(--font-mono); font-size:.9em; color:#00D4C6; }
+  @media (max-width:900px){
+    .slide-split .split{ flex-direction:column; }
+    .slide-split .split-text{ text-align:center; }
+    .slide-split .split-text li{ padding-left:0; }
+    .slide-split .split-text li::before{ display:none; }
+  }
+
+  /* ---------- problem-mapping (slide 2) ---------- */
+  .map{ display:flex; align-items:stretch; gap:1.4rem; justify-content:center; flex-wrap:wrap; }
+  .map-col{ display:flex; flex-direction:column; gap:.9rem; align-items:center; }
+  .map-label{ font-family:var(--font-mono); font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-dim); }
+  .map-plus{ align-self:center; font-family:var(--font-mono); font-size:1.6rem; color:var(--ink-dim); opacity:.5; }
+  .chip{
+    background:var(--panel); border:1px solid var(--panel-line); border-top:3px solid var(--accent,var(--teal-brt));
+    border-radius:3px; padding:1rem 1.4rem; min-width:220px; text-align:center;
+    font-size:1.02rem;
+  }
+
+  /* ---------- 3-column tactic summary ---------- */
+  .grid-3{ display:flex; gap:1.6rem; justify-content:center; flex-wrap:wrap; max-width:1100px; }
+  .col-card{
+    background:var(--panel); border:1px solid var(--panel-line);
+    border-top:3px solid var(--accent,var(--teal-brt));
+    border-radius:3px; padding:1.5rem 1.5rem 1.7rem; width:300px;
+  }
+  .col-card .eyebrow{ margin-bottom:.9rem; }
+  .col-card h3{ font-size:1.15rem; margin-bottom:1rem; }
+  .col-card ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.6rem; }
+  .col-card li{ font-size:.96rem; line-height:1.4; padding-left:1.1em; position:relative; color:var(--ink); }
+  .col-card li::before{ content:"—"; position:absolute; left:0; color:var(--accent,var(--teal-brt)); }
+  .col-card code{ font-family:var(--font-mono); font-size:.88em; color:var(--accent,var(--teal-brt)); }
+
+  /* ---------- demo scripts row ---------- */
+  .scripts{ display:flex; gap:1.2rem; flex-wrap:wrap; justify-content:center; max-width:1080px; }
+  .script-card{
+    background:var(--panel); border:1px solid var(--panel-line); border-radius:3px;
+    padding:1.2rem 1.3rem; width:225px; display:flex; flex-direction:column; gap:.6rem;
+  }
+  .script-card .file{ font-family:var(--font-mono); font-size:.92rem; color:var(--teal-brt); }
+  .script-card .desc{ font-size:.9rem; color:var(--ink-dim); line-height:1.4; }
+  .cmd{
+    font-family:var(--font-mono); font-size:1rem; background:rgba(0,0,0,.28);
+    border:1px solid var(--panel-line); border-radius:3px; padding:.7em 1.2em; color:var(--teal-brt);
+  }
+  .cmd::before{ content:"$ "; color:var(--ink-dim); }
+
+  /* ---------- traceability table ---------- */
+  table.trace{ border-collapse:collapse; width:100%; max-width:920px; font-size:.98rem; }
+  table.trace th{ font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-dim); text-align:left; padding:.6em 1em; border-bottom:1px solid var(--panel-line); font-weight:500; }
+  table.trace td{ padding:.9em 1em; border-bottom:1px solid var(--panel-line); vertical-align:top; }
+  table.trace tr td:first-child{ border-left:3px solid var(--row-accent, transparent); }
+  table.trace code{ font-family:var(--font-mono); font-size:.9em; color:var(--ink-dim); }
+
+  /* ---------- chrome: registration marks, grid label, counter, dots ---------- */
+  .brand{
+    position:fixed; top:22px; left:26px; z-index:5;
+    font-family:var(--font-mono); font-size:.75rem; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-dim); opacity:.65;
+  }
+  .sheet{
+    position:fixed; bottom:22px; right:26px; z-index:5;
+    font-family:var(--font-mono); font-size:.78rem; color:var(--ink-dim); opacity:.75;
+    font-variant-numeric:tabular-nums;
+  }
+  .reg{ position:fixed; z-index:5; font-family:var(--font-mono); color:var(--ink-dim); opacity:.35; font-size:1.1rem; line-height:1; pointer-events:none; }
+  .reg.tl{ top:18px; left:78px; } .reg.tr{ top:18px; right:78px; }
+  .reg.bl{ bottom:18px; left:26px; } .reg.br{ bottom:18px; right:78px; }
+
+  .progress{ position:fixed; top:0; left:0; height:2px; background:var(--teal-brt); z-index:6; width:0%; transition:width .15s linear; }
+
+  .dots{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%); display:flex; gap:9px; z-index:5; }
+  .dot{
+    width:8px; height:8px; border:1px solid var(--ink-dim); background:transparent; border-radius:1px;
+    padding:0; cursor:pointer; opacity:.55;
+  }
+  .dot.active{ background:var(--teal-brt); border-color:var(--teal-brt); opacity:1; }
+  .dot:focus-visible{ outline:2px solid var(--blue-brt); outline-offset:2px; }
+
+  .hint{ font-family:var(--font-mono); font-size:.8rem; color:var(--ink-dim); opacity:.6; }
+
+  @media (max-width:760px){
+    .grid-3, .scripts{ flex-direction:column; align-items:center; }
+    .col-card, .script-card{ width:100%; max-width:340px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="progress" id="progress"></div>
+  <span class="brand">TFU · UT2 — Tácticas de Arquitectura</span>
+  <span class="reg tl">+</span><span class="reg tr">+</span><span class="reg bl">+</span><span class="reg br">+</span>
+  <span class="sheet" id="sheet">01 / 10</span>
+  <nav class="dots" id="dots" aria-label="Navegación de diapositivas"></nav>
+
+  <div id="deck">
+
+    <!-- 1. PORTADA -->
+    <section class="slide" style="--glow:rgba(60,147,250,.22); --glow-x:50%; --glow-y:15%;">
+      <span class="eyebrow reveal">TFU · UT2 · Tácticas de Arquitectura</span>
+      <h1 class="title reveal d1">Configuración externa, Aspectos<br>y Sanity Checking</h1>
+      <p class="subtitle reveal d2">Una API REST en FastAPI, desplegada en Docker, para demostrar tres tácticas trabajando juntas.</p>
+      <p class="hint reveal subtitle d3">Grupo 4: Constanza Dibueno, Luis Gaudiano, Guillermo Acquistapace y Micaela Crocco</p>
+    </section>
+
+    <!-- 2. EL PROBLEMA -->
+    <section class="slide" style="--glow:rgba(0,212,198,.18); --glow-x:50%; --glow-y:0%;">
+      <span class="eyebrow reveal">Consigna</span>
+      <h2 class="title reveal d1" style="font-size:clamp(1.6rem,2.6vw,2.3rem); max-width:34ch;">Combinar tácticas para lograr distintos atributos de calidad, a la vez</h2>
+      <div class="map reveal d2">
+        <div class="map-col">
+          <span class="map-label">Protección</span>
+          <div class="chip" style="--accent:var(--green);">Sanity checking</div>
+        </div>
+        <span class="map-plus">+</span>
+        <div class="map-col">
+          <span class="map-label">Facilidad de modificación</span>
+          <div class="chip" style="--accent:var(--blue-brt);">Binding en tiempo de configuración</div>
+          <div class="chip" style="--accent:var(--teal-brt);">Aspectos</div>
+        </div>
+      </div>
+      <p class="subtitle reveal d3">Más fácil de modificar sin tocar código — y a la vez, incapaz de arrancar en un estado inválido.</p>
+    </section>
+
+    <!-- 3. RNF-01 -->
+    <section class="slide" style="--glow:rgba(60,147,250,.22); --glow-x:20%; --glow-y:30%;">
+      <span class="eyebrow reveal" style="--dot:var(--blue-brt);">RNF-01 &nbsp;<b>·</b>&nbsp; Configuración externa</span>
+      <div class="quote-card reveal d1" style="--accent:var(--blue-brt);">
+        El sistema deberá permitir habilitar, deshabilitar y ajustar funcionalidades y parámetros de negocio mediante un sistema de configuración externo, sin necesidad de modificar el código fuente ni recompilar la aplicación. Todo cambio de configuración deberá verse reflejado en menos de 60 segundos luego de reiniciar el sistema.
+      </div>
+      <div class="tag-row reveal d2">
+        <span class="tag" style="--accent:var(--blue-brt);">sin recompilar</span>
+        <span class="tag" style="--accent:var(--blue-brt);">&lt; 60s tras reiniciar</span>
+      </div>
+    </section>
+
+    <!-- 4. RNF-02 -->
+    <section class="slide" style="--glow:rgba(0,212,198,.22); --glow-x:80%; --glow-y:30%;">
+      <span class="eyebrow reveal" style="--dot:var(--teal-brt);">RNF-02 &nbsp;<b>·</b>&nbsp; Comportamientos transversales</span>
+      <div class="quote-card reveal d1" style="--accent:var(--teal-brt);">
+        El sistema deberá permitir incorporar, modificar o eliminar comportamientos transversales, como el registro de logs o métricas, sin modificar la lógica principal de negocio. La activación o desactivación de estos comportamientos deberá realizarse únicamente mediante configuración y afectando a un único módulo aislado.
+      </div>
+      <div class="tag-row reveal d2">
+        <span class="tag" style="--accent:var(--teal-brt);">un único módulo aislado</span>
+        <span class="tag" style="--accent:var(--teal-brt);">cero cambios en el negocio</span>
+      </div>
+    </section>
+
+    <!-- 5. RNF-03 -->
+    <section class="slide" style="--glow:rgba(115,204,128,.22); --glow-x:50%; --glow-y:30%;">
+      <span class="eyebrow reveal" style="--dot:var(--green);">RNF-03 &nbsp;<b>·</b>&nbsp; Validación al inicio</span>
+      <div class="quote-card reveal d1" style="--accent:var(--green);">
+        El sistema deberá validar la consistencia y validez de su configuración al iniciar y, en caso de detectar valores inválidos, incompletos o inconsistentes, deberá impedir su inicio y registrar de forma clara el motivo del error en menos de 3 segundos, sin llegar a exponer sus servicios.
+      </div>
+      <div class="tag-row reveal d2">
+        <span class="tag" style="--accent:var(--green);">&lt; 3s</span>
+        <span class="tag" style="--accent:var(--green);">nunca expone el servicio</span>
+      </div>
+    </section>
+
+    <!-- 6. ARQUITECTURA - flujo de arranque -->
+    <section class="slide slide-diagram" style="--glow:rgba(115,204,128,.16); --glow-x:85%; --glow-y:10%;">
+      <span class="eyebrow reveal">Arquitectura</span>
+      <h2 class="title reveal d1" style="font-size:clamp(1.5rem,2.4vw,2.1rem);">¿Cómo arranca el sistema?</h2>
+      <figure class="diagram reveal d2">
+        <svg viewBox="0 15 1100 330" role="img" aria-label="Config.yaml se lee y se valida antes de crear el servidor. Si la validación falla, el proceso termina y el puerto nunca se abre; solo la rama válida llega a exponer el puerto.">
+          <defs>
+            <marker id="arrowA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <rect x="40" y="220" width="170" height="90" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="125" y="259" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" fill="currentColor">config.yaml</text>
+          <text x="125" y="279" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.7">archivo externo</text>
+
+          <line x1="210" y1="265" x2="270" y2="265" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowA)"/>
+
+          <rect x="280" y="220" width="170" height="90" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="365" y="259" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" fill="currentColor">loader.py</text>
+          <text x="365" y="279" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="currentColor" opacity="0.7">arma AppConfig</text>
+
+          <line x1="450" y1="265" x2="497" y2="265" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowA)"/>
+
+          <polygon points="600,200 700,265 600,330 500,265" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="600" y="260" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" fill="currentColor">validator.py</text>
+          <text x="600" y="278" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">¿config válida?</text>
+
+          <line x1="600" y1="200" x2="600" y2="137" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#arrowA)"/>
+          <text x="616" y="172" font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor" opacity="0.85">no</text>
+
+          <rect x="470" y="40" width="280" height="90" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 4"/>
+          <text x="610" y="70" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="currentColor">sys.exit(1)</text>
+          <text x="610" y="90" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity="0.75">errores logueados</text>
+          <text x="610" y="108" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity="0.75">el puerto nunca se abre</text>
+
+          <line x1="700" y1="265" x2="750" y2="265" stroke="#73CC80" stroke-width="2" marker-end="url(#arrowA)"/>
+          <text x="725" y="251" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="#73CC80">sí</text>
+
+          <rect x="760" y="220" width="150" height="90" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="835" y="254" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="currentColor">main.py</text>
+          <text x="835" y="272" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">monta el aspecto</text>
+          <text x="835" y="288" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">e incluye routers</text>
+
+          <line x1="910" y1="265" x2="965" y2="265" stroke="#73CC80" stroke-width="2" marker-end="url(#arrowA)"/>
+
+          <rect x="975" y="230" width="95" height="70" fill="none" stroke="#73CC80" stroke-width="2"/>
+          <text x="1022" y="259" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" fill="#73CC80">:8000</text>
+          <text x="1022" y="277" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="#73CC80" opacity="0.9">puerto expuesto</text>
+        </svg>
+        <figcaption>La validación corre antes de instanciar <code>FastAPI()</code>: si la configuración es inválida, el proceso termina y el nodo de la derecha —el puerto— nunca llega a existir.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 7. ARQUITECTURA - ciclo de request -->
+    <section class="slide slide-diagram slide-split" style="--glow:rgba(0,212,198,.18); --glow-x:15%; --glow-y:10%;">
+      <span class="eyebrow reveal">Arquitectura</span>
+      <h2 class="title reveal d1" style="font-size:clamp(1.5rem,2.4vw,2.1rem);">¿Cómo se atiende un request?</h2>
+      <div class="split reveal d2">
+      <figure class="diagram">
+        <svg viewBox="0 0 1100 600" role="img" aria-label="El middleware de logging envuelve a los routers de negocio en ambas direcciones, request y response. Ese límite solo existe si request_logging_enabled es true. La configuración activa vive fuera del envoltorio y ambos routers la leen por inyección de dependencias.">
+          <defs>
+            <marker id="arrowB" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <rect x="40" y="220" width="150" height="90" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="115" y="258" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="currentColor">cliente</text>
+          <text x="115" y="276" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">curl · Postman</text>
+
+          <rect x="280" y="90" width="650" height="320" rx="14" fill="none" stroke="#00D4C6" stroke-width="1.8" stroke-dasharray="5 5"/>
+          <text x="302" y="118" font-family="IBM Plex Mono, monospace" font-size="13" fill="#00D4C6">aspecto de logging</text>
+          <text x="302" y="136" font-family="IBM Plex Sans, sans-serif" font-size="10.5" fill="#00D4C6" opacity="0.85">existe solo si request_logging_enabled = true</text>
+
+          <line x1="190" y1="245" x2="272" y2="245" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowB)"/>
+          <text x="231" y="235" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity="0.85">request</text>
+
+          <line x1="272" y1="292" x2="190" y2="292" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowB)"/>
+          <text x="231" y="312" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" opacity="0.85">response</text>
+
+          <rect x="340" y="190" width="250" height="90" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="465" y="228" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="currentColor">business.py</text>
+          <text x="465" y="246" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">GET /greeting</text>
+
+          <rect x="660" y="190" width="220" height="90" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="770" y="228" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="currentColor">meta.py</text>
+          <text x="770" y="246" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">GET /config</text>
+
+          <rect x="540" y="330" width="160" height="55" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <text x="620" y="362" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" fill="currentColor">Depends(get_config)</text>
+
+          <line x1="465" y1="280" x2="600" y2="330" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrowB)"/>
+          <line x1="770" y1="280" x2="640" y2="330" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrowB)"/>
+
+          <line x1="620" y1="385" x2="620" y2="465" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowB)"/>
+
+          <rect x="470" y="470" width="300" height="72" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="620" y="502" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="currentColor">AppConfig</text>
+          <text x="620" y="520" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.7">en memoria · app.state</text>
+        </svg>
+      </figure>
+      <div class="split-text">
+        <ul>
+          <li>El límite punteado es el <strong>middleware de logging</strong></li>
+          <li>Envuelve el <em>request</em> y la <em>response</em> — las dos direcciones</li>
+          <li>Solo existe si <code>request_logging_enabled = true</code></li>
+          <li><code>AppConfig</code> vive afuera: los routers la leen, el aspecto no la toca</li>
+        </ul>
+      </div>
+      </div>
+    </section>
+
+    <!-- 8. DE LA TÁCTICA A LA IMPLEMENTACIÓN -->
+    <section class="slide" style="--glow:rgba(60,147,250,.14); --glow-x:50%; --glow-y:0%;">
+      <span class="eyebrow reveal">Implementación</span>
+      <h2 class="title reveal d1" style="font-size:clamp(1.6rem,2.6vw,2.2rem);">De la táctica a tres módulos concretos</h2>
+      <div class="grid-3 reveal d2">
+        <div class="col-card" style="--accent:var(--blue-brt);">
+          <span class="eyebrow" style="--dot:var(--blue-brt);">RNF-01</span>
+          <h3>Binding en config.</h3>
+          <ul>
+            <li><code>config.yaml</code> externo, no forma parte del código</li>
+            <li><code>GET /config</code> expone el estado activo</li>
+            <li><code>GET /greeting</code> cambia según <code>mode</code></li>
+          </ul>
+        </div>
+        <div class="col-card" style="--accent:var(--teal-brt);">
+          <span class="eyebrow" style="--dot:var(--teal-brt);">RNF-02</span>
+          <h3>Aspectos</h3>
+          <ul>
+            <li>Middleware aislado en <code>aspects/</code></li>
+            <li>Se monta solo si el flag es <code>true</code></li>
+            <li>Cero logging en los endpoints de negocio</li>
+          </ul>
+        </div>
+        <div class="col-card" style="--accent:var(--green);">
+          <span class="eyebrow" style="--dot:var(--green);">RNF-03</span>
+          <h3>Sanity checking</h3>
+          <ul>
+            <li>Corre al importar <code>main.py</code></li>
+            <li>Antes de crear la app FastAPI</li>
+            <li>Exit code ≠ 0 si algo falla</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. DEMO -->
+    <section class="slide" style="--glow:rgba(15,166,157,.18); --glow-x:50%; --glow-y:5%;">
+      <span class="eyebrow reveal">Demo</span>
+      <h2 class="title reveal d1" style="font-size:clamp(1.6rem,2.6vw,2.2rem);">Cómo se prueba, de punta a punta</h2>
+      <div class="scripts reveal d2">
+        <div class="script-card">
+          <span class="file">start.sh</span>
+          <span class="desc">Levanta el stack completo con Docker.</span>
+        </div>
+        <div class="script-card">
+          <span class="file">demo_rnf01.sh</span>
+          <span class="desc">Cambia <code>mode</code>, reinicia, compara respuestas.</span>
+        </div>
+        <div class="script-card">
+          <span class="file">demo_rnf02.sh</span>
+          <span class="desc">Activa y desactiva el aspecto por config.</span>
+        </div>
+        <div class="script-card">
+          <span class="file">demo_rnf03.sh</span>
+          <span class="desc">Config inválida → el puerto no responde.</span>
+        </div>
+      </div>
+      <span class="cmd reveal d3">docker compose up --build</span>
+    </section>
+
+    <!-- 10. CIERRE -->
+    <section class="slide" style="--glow:rgba(233,239,245,.1); --glow-x:50%; --glow-y:0%;">
+      <span class="eyebrow reveal">Trazabilidad</span>
+      <table class="trace reveal d1">
+        <thead>
+          <tr><th>RNF</th><th>Táctica</th><th>Mecanismo clave</th></tr>
+        </thead>
+        <tbody>
+          <tr style="--row-accent:var(--blue-brt);"><td>RNF-01</td><td>Binding en tiempo de config.</td><td><code>config.yaml</code> + <code>GET /config</code> + <code>GET /greeting</code></td></tr>
+          <tr style="--row-accent:var(--teal-brt);"><td>RNF-02</td><td>Aspectos</td><td>Middleware aislado en <code>aspects/</code></td></tr>
+          <tr style="--row-accent:var(--green);"><td>RNF-03</td><td>Sanity checking</td><td>Validación pre-arranque en <code>main.py</code></td></tr>
+        </tbody>
+      </table>
+      <h2 class="title reveal d2" style="margin-top:1rem;">Gracias</h2>
+    </section>
+
+  </div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var deck = document.getElementById('deck');
+  var dotsNav = document.getElementById('dots');
+  var sheetEl = document.getElementById('sheet');
+  var progressEl = document.getElementById('progress');
+  var current = 0;
+
+  slides.forEach(function(s, i){
+    var b = document.createElement('button');
+    b.className = 'dot' + (i===0 ? ' active':'');
+    b.setAttribute('aria-label', 'Ir a la diapositiva ' + (i+1));
+    b.addEventListener('click', function(){ goTo(i); });
+    dotsNav.appendChild(b);
+  });
+  var dots = Array.prototype.slice.call(dotsNav.children);
+
+  function pad(n){ return (n+1) < 10 ? '0'+(n+1) : ''+(n+1); }
+
+  function updateUI(i){
+    current = i;
+    dots.forEach(function(d, idx){ d.classList.toggle('active', idx===i); });
+    sheetEl.textContent = pad(i) + ' / ' + slides.length;
+  }
+
+  function goTo(i){
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    slides[i].scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  window.addEventListener('keydown', function(e){
+    if (['ArrowRight','ArrowDown','PageDown',' '].indexOf(e.key) !== -1){ e.preventDefault(); goTo(current+1); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].indexOf(e.key) !== -1){ e.preventDefault(); goTo(current-1); }
+    else if (e.key === 'Home'){ e.preventDefault(); goTo(0); }
+    else if (e.key === 'End'){ e.preventDefault(); goTo(slides.length-1); }
+  });
+
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting && entry.intersectionRatio > 0.55){
+        var idx = slides.indexOf(entry.target);
+        updateUI(idx);
+        entry.target.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
+      }
+    });
+  }, { root: deck, threshold: [0.55] });
+  slides.forEach(function(s){ io.observe(s); });
+
+  deck.addEventListener('scroll', function(){
+    var max = deck.scrollHeight - deck.clientHeight;
+    var pct = max > 0 ? (deck.scrollTop / max) * 100 : 0;
+    progressEl.style.width = pct + '%';
+  });
+
+  updateUI(0);
+})();
+</script>
+</body>
+</html>
