@@ -5,15 +5,34 @@ services:
     image: postgres:16-alpine
     container_name: investnow_db
     environment:
-      POSTGRES_USER: investnow_user
-      POSTGRES_PASSWORD: secure_password
-      POSTGRES_DB: investnow_wallet_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
       - investnow-net
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - CATALOG_SERVICE_URL=http://catalog_service:8000
+      - WALLET_SERVICE_URL=http://wallet_service:8000
+      - ORDER_SERVICE_URL=http://order_service:8000
+    depends_on:
+      - catalog_service
+      - wallet_service
+      - order_service
+    networks:
+      - investnow-net
+    volumes:
+      - ./app/config:/app/config
 
   wallet_service:
     build:
@@ -22,7 +41,7 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://investnow_user:secure_password@postgres_db:5432/investnow_wallet_db
+      - DATABASE_URL=${DATABASE_URL}
     depends_on:
       - postgres_db
     networks:
@@ -48,8 +67,8 @@ services:
     ports:
       - "8003:8000"
     environment:
-      - CATALOG_SERVICE_URL=http://catalog_service:8000
-      - WALLET_SERVICE_URL=http://wallet_service:8000
+      - CATALOG_SERVICE_URL=${CATALOG_SERVICE_URL}
+      - WALLET_SERVICE_URL=${WALLET_SERVICE_URL}
     depends_on:
       - catalog_service
       - wallet_service
