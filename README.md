@@ -30,19 +30,21 @@ unidad correspondiente en vez de inferirlo del diff de código.
 
 ```
 app/
-  main.py            # servicio "api" (UT2): valida config -> arma la app -> levanta el servidor
-  catalog_main.py     # servicio de Catálogo (UT3)
-  wallet_main.py       # servicio de Wallet (UT3)
+  main.py               # servicio "api" (UT2): valida config -> arma la app -> levanta el servidor
+  catalog_main.py       # servicio de Catálogo (UT3)
+  wallet_main.py        # servicio de Wallet (UT3), persiste en Postgres
   order_main.py         # servicio de Órdenes (UT3)
-  config/             # config.yaml compartido + carga y validación (UT2)
-  aspects/            # aspecto de logging, aislado del resto de la app (UT2)
-  routers/            # endpoints de cada servicio
-docker/               # un Dockerfile por servicio (api, catalog, wallet, order)
-docker-compose.yaml   # levanta los 4 servicios + Postgres
-scripts/              # arranque y demos de cada RNF (UT2)
+  config/               # config.yaml compartido + carga y validación (UT2)
+  aspects/              # aspecto de logging, aislado del resto de la app (UT2)
+  routers/              # endpoints de cada servicio
+docker/                 # un Dockerfile por servicio (api, catalog, wallet, order) + init.sql de Postgres
+docker-compose.yaml     # levanta los 4 servicios + Postgres
+docker-compose.scaling.yml  # proyecto de Compose separado para escalar catalog_service (ver demo_ut3_scaling.sh)
+scripts/                # demos de cada RNF (UT2) y de cada concepto de UT3
 docs/
-  UT2/                # documentación de la entrega de UT2
-  UT3/                # documentación de la entrega de UT3
+  UT1/                  # documentación de la entrega de UT1
+  UT2/                  # documentación de la entrega de UT2
+  UT3/                  # documentación de la entrega de UT3
 ```
 
 ---
@@ -50,6 +52,7 @@ docs/
 ## Puesta en marcha (stack completo)
 
 ```bash
+cp .env.example .env   # una sola vez
 docker compose up --build
 ```
 
@@ -58,11 +61,13 @@ Esto levanta:
 | Servicio          | Puerto | Origen |
 |-------------------|--------|--------|
 | `api`             | 8000   | UT2 (demo de tácticas de arquitectura) |
-| `wallet_service`  | 8001   | UT3 |
+| `wallet_service`  | 8001   | UT3 (saldo persistido en Postgres) |
 | `catalog_service` | 8002   | UT3 |
 | `order_service`   | 8003   | UT3 |
 | `postgres_db`     | 5432   | UT3 |
 
 Para las demos puntuales de cada RNF de UT2 ver la sección de scripts en
 [`docs/UT2/ENTREGA.md`](docs/UT2/ENTREGA.md#6-scripts); para probar los
-endpoints de UT3 ver [`docs/UT3/PRUEBAS_ENDPOINTS.md`](docs/UT3/PRUEBAS_ENDPOINTS.md).
+endpoints de UT3 ver [`docs/UT3/PRUEBAS_ENDPOINTS.md`](docs/UT3/PRUEBAS_ENDPOINTS.md);
+para las demos de ACID, servicios sin estado y escalabilidad horizontal de
+UT3 ver la sección 7 de [`docs/UT3/ENTREGA.md`](docs/UT3/ENTREGA.md).

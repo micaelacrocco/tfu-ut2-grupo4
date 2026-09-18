@@ -1,8 +1,14 @@
+import socket
+
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/api/v1", tags=["Catalog Service"])
 
-# Base de datos simulada en memoria para la demo
+# Base de datos simulada en memoria para la demo. Al vivir en el proceso, cada
+# réplica de este servicio tiene su propia copia: el catálogo se considera
+# "de solo lectura" a los fines de la demo de escalabilidad horizontal
+# (ver scripts/demo_ut3_scaling.sh); habilitar/deshabilitar un activo
+# (I-CAT-02) solo afecta a la réplica que atendió esa request.
 assets_db = {
     1: {"id": 1, "name": "Apple Inc.", "symbol": "AAPL", "status": "active"},
     2: {"id": 2, "name": "S&P 500 ETF", "symbol": "SPY", "status": "active"},
@@ -11,8 +17,14 @@ assets_db = {
 
 @router.get("/assets")
 def get_assets():
-    """I-CAT-01: Consulta pública del catálogo de activos."""
-    return list(assets_db.values())
+    """I-CAT-01: Consulta pública del catálogo de activos.
+
+    Incluye `served_by` (hostname del contenedor) para poder evidenciar,
+    al escalar horizontalmente este servicio, que distintas réplicas
+    responden indistintamente a la misma solicitud.
+    """
+    served_by = socket.gethostname()
+    return [{**asset, "served_by": served_by} for asset in assets_db.values()]
 
 @router.patch("/assets/{asset_id}/status")
 def update_asset_status(asset_id: int, status: str):

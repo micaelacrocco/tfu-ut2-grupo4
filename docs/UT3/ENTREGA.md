@@ -56,7 +56,47 @@ La solución se descompone en tres componentes principales desacoplados:
 
 * **Dependencias:** *Servicio de Catálogo* y *Servicio de Cuentas y Saldos*.
 
+### Diagrama de componentes (fuente PlantUML)
 
+Pegar el bloque de abajo en https://editor.plantuml.com para visualizarlo.
+
+```plantuml
+@startuml
+skinparam defaultTextAlignment center
+skinparam componentStyle uml2
+
+title Diagrama de Componentes UML - InvestNow (Interfaces y Dependencias)
+
+' Definición de los componentes principales
+component "[ Servicio de Catálogo ]" as CatalogService
+component "[ Servicio de Cuentas y Saldos ]" as WalletService
+component "[ Servicio de Órdenes ]" as OrderService
+
+' -------------------------------------------------------------
+' 1. INTERFACES EXPUESTAS (Proporcionadas / "Lollipop")
+' -------------------------------------------------------------
+interface "I-CAT-01: Consulta de Activos\n(GET /api/v1/assets)" as ICatPublic
+interface "I-CAT-02: Administración\n(PATCH /assets/{id}/status)" as ICatAdmin
+interface "I-WAL-01: Consulta de Saldo\n(GET /api/v1/wallets/{id})" as IWalPublic
+interface "I-WAL-02: Transacción Atómica ACID\n(POST /wallets/transact)" as IWalInternal
+interface "I-ORD-01: Gestión de Órdenes\n(POST/GET /api/v1/orders)" as IOrdPublic
+
+' Conexión de los componentes con las interfaces que EXPONEN
+CatalogService -- ICatPublic
+CatalogService -- ICatAdmin
+WalletService -- IWalPublic
+WalletService -- IWalInternal
+OrderService -- IOrdPublic
+
+' -------------------------------------------------------------
+' 2. INTERFACES CONSUMIDAS Y DEPENDENCIAS (Requeridas / "Socket")
+' -------------------------------------------------------------
+' El Servicio de Órdenes requiere (consume) las interfaces de Catálogo y Cuentas
+OrderService ..> ICatPublic : "Consume"
+OrderService ..> IWalInternal : "Consume"
+
+@enduml
+```
 
 ---
 
@@ -97,41 +137,106 @@ El proceso metodológico aplicado para llegar a esta estructura de componentes c
 * *Riesgo de Negocio:* Esto permitiría condiciones de carrera (*race conditions*) donde un inversor podría gastar fondos inexistentes o duplicados antes de que la red propague el estado real del saldo a los demás microservicios.
 * *Conclusión:* Para un dominio financiero, el sacrificio de consistencia que impone BASE resulta inaceptable, obligando a asumir el costo de bloqueo y sincronización estricta que provee ACID.
 
-El diagrama se puede ver y editar en https://editor.plantuml.com
+---
 
-@startuml
-skinparam defaultTextAlignment center
-skinparam componentStyle uml2
+## 7. Implementación (Parte 2)
 
-title Diagrama de Componentes UML - InvestNow (Interfaces y Dependencias)
+### ACID — transacción real con lock de fila
 
-' Definición de los componentes principales
-component "[ Servicio de Catálogo ]" as CatalogService
-component "[ Servicio de Cuentas y Saldos ]" as WalletService
-component "[ Servicio de Órdenes ]" as OrderService
+`wallet_service` persiste los saldos en la tabla `wallets` de Postgres
+(esquema en `docker/postgres/init.sql`), no en memoria. `POST
+/api/v1/wallets/transact` (`app/routers/wallet_router.py`) ejecuta, dentro
+de una única transacción:
 
-' -------------------------------------------------------------
-' 1. INTERFACES EXPUESTAS (Proporcionadas / "Lollipop")
-' -------------------------------------------------------------
-interface "I-CAT-01: Consulta de Activos\n(GET /api/v1/assets)" as ICatPublic
-interface "I-CAT-02: Administración\n(PATCH /assets/{id}/status)" as ICatAdmin
-interface "I-WAL-01: Consulta de Saldo\n(GET /api/v1/wallets/{id})" as IWalPublic
-interface "I-WAL-02: Transacción Atómica ACID\n(POST /wallets/transact)" as IWalInternal
-interface "I-ORD-01: Gestión de Órdenes\n(POST/GET /api/v1/orders)" as IOrdPublic
+1. `SELECT balance FROM wallets WHERE user_id = %s FOR UPDATE` — toma un
+   lock exclusivo de esa fila, bloqueando a cualquier otra transacción
+   concurrente sobre el mismo usuario hasta que esta termine.
+2. Valida que el nuevo saldo no sea negativo.
+3. `UPDATE` del saldo.
 
-' Conexión de los componentes con las interfaces que EXPONEN
-CatalogService -- ICatPublic
-CatalogService -- ICatAdmin
-WalletService -- IWalPublic
-WalletService -- IWalInternal
-OrderService -- IOrdPublic
+Si algo falla (usuario inexistente, fondos insuficientes, o cualquier
+excepción), la transacción hace rollback completo: nunca queda un saldo a
+mitad de camino. `scripts/demo_ut3_acid.sh` dispara varios débitos
+concurrentes sobre la misma cuenta y muestra que el resultado es
+consistente.
 
-' -------------------------------------------------------------
-' 2. INTERFACES CONSUMIDAS Y DEPENDENCIAS (Requeridas / "Socket")
-' -------------------------------------------------------------
-' El Servicio de Órdenes requiere (consume) las interfaces de Catálogo y Cuentas
-OrderService ..> ICatPublic : "Consume"
-OrderService ..> IWalInternal : "Consume"
+### Servicios sin estado
 
-@enduml
+`wallet_service` no guarda estado de negocio en el proceso: todo vive en
+Postgres, compartido por cualquier instancia del servicio. Como
+consecuencia, un contenedor de `wallet_service` puede reiniciarse (o
+reemplazarse por uno nuevo) sin perder ni resetear el saldo de nadie —
+`scripts/demo_ut3_stateless.sh` lo evidencia matando y recreando el
+contenedor a mitad de una secuencia de operaciones.
 
+`catalog_service`, en cambio, mantiene su catálogo en un diccionario en
+memoria (`app/routers/catalog_router.py`) — una simplificación de alcance
+deliberada (la letra permite ajustar el alcance funcional): a los fines de
+esta demo solo la lectura (`GET /assets`) se trata como *stateless* y
+apta para escalar horizontalmente; la administración (`PATCH
+/assets/{id}/status`) solo afecta a la réplica que atendió esa request
+puntual y no se sincroniza entre réplicas.
+
+### Escalabilidad horizontal
+
+`scripts/demo_ut3_scaling.sh` levanta 3 réplicas **adicionales** de
+`catalog_service`, sin puerto fijo de host, como un proyecto de Compose
+separado (`docker-compose.scaling.yml`) sobre la misma red
+`investnow-net` que ya usa el stack principal. La instancia original
+(la que publica el puerto 8002) sigue corriendo sin tocarse.
+
+Todas las réplicas (la original + las 3 nuevas) quedan con el mismo alias
+DNS `catalog_service` dentro de `investnow-net`, así que Docker reparte
+las requests entre todas por *round-robin* automático — sin agregar
+ningún balanceador nuevo a la arquitectura — y cada respuesta incluye
+`served_by` (el hostname del contenedor que la atendió) para poder
+comprobarlo.
+
+**Aclaración deliberada:** el DNS round-robin de Docker demuestra el
+*concepto* de escalabilidad horizontal (varias réplicas idénticas
+atendiendo la misma responsabilidad, sin estado compartido entre ellas),
+pero no reemplaza a un load balancer real. Le faltan capacidades que sí
+tiene un LB de producción (nginx, HAProxy, un ALB):
+
+- **Health checking:** Docker retira una entrada del DNS cuando el
+  contenedor muere, pero no verifica que el proceso adentro responda
+  correctamente (podría estar colgado o devolviendo errores).
+- **Balanceo por request, no por conexión:** la resolución DNS ocurre una
+  vez por conexión TCP; un cliente con *keep-alive* o *connection
+  pooling* seguiría mandando todas sus requests a la misma réplica hasta
+  reabrir conexión. Por eso el script abre una conexión nueva en cada
+  llamada, para forzar una resolución distinta cada vez.
+- **Solo round-robin simple:** sin *least-connections*, *weighted
+  routing*, *sticky sessions* ni conciencia de la carga real de cada
+  instancia.
+- **Es L4/nombre, no L7:** no hay ruteo por path o header, TLS
+  termination, retries ni *circuit breaking*.
+
+Elegimos esta vía a propósito para demostrar el concepto sin sumar un
+componente nuevo a la arquitectura, no porque desconozcamos la
+diferencia con un load balancer real.
+
+### Scripts de esta entrega
+
+Requieren el stack levantado (`docker compose up --build`, con un `.env`
+creado a partir de `.env.example`) corriendo en otra terminal.
+
+| Script                          | Qué hace |
+|----------------------------------|----------|
+| `scripts/demo_ut3_acid.sh`       | Dispara 5 débitos concurrentes (`&` + `wait`) sobre el mismo usuario en `wallet_service` y muestra el saldo antes/después. El lock de fila (`FOR UPDATE`) los serializa: el resultado final es siempre consistente, nunca queda negativo ni se "pierde" un débito por una condición de carrera. Al terminar, restaura el saldo original del usuario para poder volver a correrlo. |
+| `scripts/demo_ut3_stateless.sh`  | Debita saldo, mata y recrea el contenedor de `wallet_service` (`docker compose kill` + `up -d`), y vuelve a consultar el saldo. Como el estado vive en Postgres y no en el proceso, el débito se mantiene aunque el proceso haya muerto y arrancado de cero. Al terminar, restaura el saldo original. |
+| `scripts/demo_ut3_scaling.sh`    | Levanta 3 réplicas adicionales de `catalog_service`, sin puerto fijo de host, como proyecto de Compose separado (`docker-compose.scaling.yml`) sobre la misma red que el stack principal; la instancia original (puerto 8002) no se toca. Dispara 8 requests desde dentro del contenedor de `order_service` (que ya tiene `httpx`) contra el nombre DNS interno `catalog_service`. Se ven distintos valores de `served_by` (hostname del contenedor) entre las respuestas, evidenciando el *round-robin* automático de Docker entre las 4 instancias — sin agregar ningún balanceador nuevo. Al terminar, baja solo las 3 réplicas adicionales. |
+
+```bash
+bash scripts/demo_ut3_acid.sh
+bash scripts/demo_ut3_stateless.sh
+bash scripts/demo_ut3_scaling.sh
+```
+
+`demo_ut3_scaling.sh` usa `docker compose exec`, así que hay que correrlo
+desde el mismo directorio/contexto que el `docker compose up` (mismo
+`.env` y mismo proyecto de compose).
+
+Antes de correrlos, alcanza con las instrucciones de
+[`PRUEBAS_ENDPOINTS.md`](PRUEBAS_ENDPOINTS.md) para validar que cada
+servicio responde.

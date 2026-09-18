@@ -1,0 +1,27 @@
+# Compose standalone (NO se pasa junto con -f docker-compose.yaml) para
+# escalar catalog_service horizontalmente sin puerto fijo de host.
+#
+# No se mergea con docker-compose.yaml a propósito: Docker Compose
+# concatena (no reemplaza) la lista de "ports" entre archivos -f, así que
+# un override con "ports: []" no elimina el mapeo del archivo base. Por
+# eso esto corre como un proyecto de Compose aparte (ver
+# scripts/demo_ut3_scaling.sh), sobre la misma red "investnow-net" ya
+# creada por el stack principal: la instancia original de catalog_service
+# (con el puerto 8002) sigue corriendo sin tocarse, y estas réplicas
+# adicionales se suman a la misma resolución DNS interna bajo el mismo
+# nombre "catalog_service".
+
+services:
+  catalog_service:
+    build:
+      context: .
+      dockerfile: docker/catalog/Dockerfile
+    networks:
+      - investnow-net
+    volumes:
+      - ./app/config:/app/config
+
+networks:
+  investnow-net:
+    external: true
+    name: investnow-net

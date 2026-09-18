@@ -4,6 +4,8 @@
 
 Documentación de referencia rápida con comandos `curl` para verificar el funcionamiento de las interfaces expuestas por cada microservicio de la plataforma desplegado en Docker.
 
+Antes de correr estos comandos: `cp .env.example .env` y `docker compose up --build` desde la raíz del repo. Para los scripts que demuestran ACID, statelessness y escalabilidad horizontal ver la sección 7 de [`ENTREGA.md`](ENTREGA.md).
+
 ---
 
 ## 1. Servicio de Catálogo de Activos (`http://localhost:8002`)
@@ -17,6 +19,8 @@ curl -X GET http://localhost:8002/api/v1/assets \
   -H "Content-Type: application/json"
 
 ```
+
+Cada activo devuelto incluye `served_by` (hostname del contenedor que respondió), usado en `scripts/demo_ut3_scaling.sh` para evidenciar que distintas réplicas atienden la misma consulta.
 
 ### Actualizar Estado de un Activo (`I-CAT-02`)
 
