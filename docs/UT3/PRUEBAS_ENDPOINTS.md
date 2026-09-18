@@ -1,5 +1,7 @@
 # Guía de Pruebas de Endpoints - InvestNow (Unidad 3)
 
+> Complementa [`ENTREGA.md`](ENTREGA.md) (Unidad 3).
+
 Documentación de referencia rápida con comandos `curl` para verificar el funcionamiento de las interfaces expuestas por cada microservicio de la plataforma desplegado en Docker.
 
 ---
