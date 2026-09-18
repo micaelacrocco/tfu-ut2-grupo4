@@ -32,7 +32,7 @@ services:
     networks:
       - investnow-net
     volumes:
-      - ./app/config:/app/config
+      - ./app/config:/app/app/config
 
   wallet_service:
     build:
